@@ -1,8 +1,6 @@
 import requests
-
+import numpy as np
 import pandas as pd
-
-
 
 #%%
 def hag_get_tests():
@@ -48,3 +46,21 @@ def hag_create_df():
     df['rapid-tests']=pd.to_numeric(df['rapid-tests'].fillna(0), downcast='integer')
     df['tests']=pd.to_numeric(df['tests'].fillna(0), downcast='integer')
     return df
+
+
+def prepare_cases(new_cases , 
+    cutoff=25, 
+    periods_count=14, 
+    stds=4):
+    
+    smoothed = new_cases.rolling(periods_count,
+        win_type='gaussian',
+        min_periods=1,
+        center=True).mean(std=stds).round()
+    
+    idx_start = np.searchsorted(smoothed, cutoff)
+    
+    smoothed = smoothed.iloc[idx_start:]
+    original = new_cases.loc[smoothed.index]
+    
+    return  smoothed
