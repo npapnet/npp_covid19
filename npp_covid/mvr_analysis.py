@@ -100,10 +100,11 @@ class ModelContainer():
         plt.title(f'Residuals vs Fitted Values', fontsize=17)
 
         # distributon of residuals  - checking for nomrality
-        plt.figure()
+        # fig, ax = plt.subplots()
         resid_mean = round (results.resid.mean(),3)
         resid_skew = round (results.resid.skew(),3)
-        sns.distplot(results.resid, color = 'navy')
+        # sns.displot(results.resid, color = 'navy',kind='kde', ax=ax)
+        sns.displot(results.resid, color = 'navy',kind='hist', kde=True, rug=True)
         plt.title(f'price model: residuals Skew:({resid_skew}) Mean: ({resid_mean})')
 
 
