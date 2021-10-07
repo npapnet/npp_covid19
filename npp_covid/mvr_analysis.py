@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 
-from npp_covid.heroku import hag_create_df, prepare_cases_gaussian
+from npp_covid.io.heroku import hag_create_df
+from npp_covid.misc.smooth_funcs import prepare_cases_gaussian
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
