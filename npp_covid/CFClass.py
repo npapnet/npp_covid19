@@ -1,5 +1,6 @@
 
 #%%
+from typing import Union
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -15,6 +16,11 @@ from scipy.optimize import curve_fit
 
 PLT_FIGSIZE=(16,9)
 class Data_Container():
+    """This is a basic DataContainer that is used as a parent  for other classes 
+
+    - CF_Data_Container
+    - MVR_Data_Container
+    """
     
     def __init__(self, datadir):
         self._datadir = datadir
@@ -28,8 +34,20 @@ class Data_Container():
         self._tests_func  = tests_func
         self._df.eval(tests_func, inplace=True)
 
-    def preprocessing(self, cleanup_func, smooth_func):
-        """performs complete preprocessing on a dataset"""
+    def preprocessing(self, cleanup_func, smooth_func)->pd.DataFrame:
+        """performs complete preprocessing on a dataset
+
+        Args:
+            cleanup_func ([type]): [description]
+            smooth_func ([type]): [description]
+
+        Returns:
+            pd.DataFrame: Dataframe after cleaning and smoothing.
+        """
+        if cleanup_func is None:
+            cleanup_func = lambda x: x.copy()
+        
+
         dfc = self.data_cleanup(cleanup_func)
         dfcp = self.process_smoothed_data(dfc, smooth_func=smooth_func)
         dfcp = dfcp [ np.isfinite(dfcp).all(1)]
@@ -38,6 +56,16 @@ class Data_Container():
         return dfcp
 
     def data_cleanup(self, cleanup_func)->pd.DataFrame:
+        """Function that performs the cleanup. uses a user supplied function
+
+        This is normally called from preprocessing()
+
+        Args:
+            cleanup_func ([type]): [description]
+
+        Returns:
+            pd.DataFrame: [description]
+        """
         tmp_df = cleanup_func(self._df.copy())
         return tmp_df
 
@@ -92,8 +120,13 @@ class Data_Container():
         return df
 
     def save_to_excel_processed_file(self,fname):
+        """Saves to files
+
+        Args:
+            fname ([type]): [description]
+        """
         try:
-            self.hag_d.to_excel(pathlib.Path(RAW_DATA_DIRNAME, fname))
+            self.hag_d.to_excel(pathlib.Path(self._datadir, fname))
         except Exception as err:
             print("Could not save to file")
             print(type(err))
@@ -113,6 +146,16 @@ class Data_Container():
         return np.sqrt(((df_m[col1_name] - df_m[col2_name])**2).sum()/df_m.shape[0])
 
     def get_weekday_samples(self, data_series_name, wkday1:int, wkday2:int):
+        """Function that 
+
+        Args:
+            data_series_name ([type]): [description]
+            wkday1 (int): [description]
+            wkday2 (int): [description]
+
+        Returns:
+            [type]: [description]
+        """
         
         df_w = self.process_weekly_Series(data_series_name)
         def select_weekday_data(df_w:pd.DataFrame, weekday:int)->pd.DataFrame:
@@ -150,6 +193,101 @@ class CF_Data_Container(Data_Container):
         self.asdf.eval('ratio_tests=tests/sm_tests', inplace=True)
 
         return self.asdf         
+
+
+class CFCalcForCI_Plots():
+    '''this is a complementary class  to CF calculation for the final plot
+    the reasoning that this is used to calculate and contain the data for the plot
+    and also to use the coefficients and model for the comparison plots.
+
+    Example usage:
+    - fpc = CFCalcForCI_Plots(x_data=asdf['tests'], y_data=asdf['ratio_pos_idx'])
+    - print(fpc.calc_params(model_func=hyperbolic))
+    - dic_whisk=fpc.calc_whisker_plot(bins = np.linspace(0, 4e5, 11))
+    - print(fpc.calc_cis())
+    '''
+    def __init__(self, x_data, y_data) -> None:
+        """Initialisation with data points
+
+        Args:
+            x_data ([type]): x-axis data
+            y_data ([type]): y-axis data
+        """
+        self.x_data = np.asarray(x_data)
+        self.y_data = np.asarray(y_data)
+
+    def calc_params(self, model_func):
+        """Parameter calculation
+
+        Args:
+            model_func (function): a function to be fitted with the model 
+
+        Returns:
+            dict: {'parameters': ``nd.array``, 'cov':``nd.array``, 'sigma':``nd.array``, 'model_name':``str``}
+        """
+        self.model_func = model_func
+        self.parameters, self.covariance = curve_fit(model_func, self.x_data , self.y_data)
+        self.sigma_ab = np.sqrt(np.diagonal(self.covariance))
+        return {'parameters':self.parameters, 'cov':self.covariance, 'sigma':self.sigma_ab, 'model_name':model_func.__name__}
+        # the covariance can be used for parameter estimation 
+        # e.g. for parameter 1, the values are between:
+        #           paramaters[0]- covariance[0,0]**2*tval 
+        # and 
+        #           paramaters[0]+ covariance[0,0]**2*tval 
+        # (tval: is the student-t value for the dof and confidence level)
+        # see
+        # - https://kitchingroup.cheme.cmu.edu/blog/2013/02/12/Nonlinear-curve-fitting-with-parameter-confidence-intervals/
+        # - https://stackoverflow.com/questions/39434402/how-to-get-confidence-intervals-from-curve-fit
+
+    def calc_whisker_plot(self, bins):
+        """calculates the whisker plot data.
+
+        Args:
+            bins ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
+
+        binsize = np.diff(bins).min()
+        x_bins = pd.cut(self.x_data, bins)
+        bins_centers =(bins[:-1] + bins[1:])/2
+        x_bc = (bins_centers[x_bins.codes]) #.astype(dtype='int')
+        x_bcu = np.unique(x_bc)
+        y_binned = dict()
+        for k in x_bcu :
+            y_binned[k] = list(self.y_data[x_bc==k])
+        return {
+            'binsize': binsize,
+            'x_bins_all': x_bins,
+            'x_bin_centers': bins_centers,
+            'y_bin_data': y_binned 
+        }
+
+    def calc_cis(self, num_points:int=101, alpha:float=0.01):
+        """Calculates the data series for the ci plot
+
+        Args:
+            num_points (int, optional): number of equispaced datapoints. Defaults to 100.
+        """        
+        hires_x = np.linspace(self.x_data.min(), self.x_data.max(), num_points)
+        hires_y = self.model_func(hires_x, *self.parameters)
+        dof = len(self.y_data)-len(self.parameters)
+        tval = stats.t.ppf(1.0-alpha/2., dof)
+        bound_upper = self.model_func(hires_x, *(self.parameters + self.sigma_ab*tval))
+        bound_lower = self.model_func(hires_x, *(self.parameters - self.sigma_ab*tval))
+        self.dict_cis = {
+            'x': hires_x,
+            'y': hires_y,
+            'dof': dof,
+            't-statistic': tval,
+            'y_upper': bound_upper,
+            'y_lower':bound_lower
+        }
+        return self.dict_cis
+
+#%% Plot classes
+
 class CF_plots_class():
     ''' This is a class that uses the Data Container object to plot information
     '''
@@ -324,68 +462,77 @@ class CF_analysis_plots():
         plt.grid()
         plt.title('Normalised positive rate vs inverse of no. tests (loglog scale)  ')
 
+    def plot_model_with_ci2(self, x_name:str, y_name:str, model_func, 
+        alpha:float=0.01, whisker_plot:bool=True, 
+        bins:Union[int,float,np.ndarray] = None,
+        xlab:str=None, ylab:str=None)->dict:
+        """ plots a fitted model to x_data and y_data and also plots confinence intervals and whisker plots
+        
+        this version uses the FinalPlotCalculations
+        
 
-    def plot_model_with_ci(self, x_name:str, y_name:str, model_func, alpha=0.01, whisker_plot:bool=True, bins = np.arange(0, 50000, 2000),
-        xlab:str=None, ylab:str=None):
-        ''' plots a fitted model to x_data and y_data and also plots confinence intervals and whisker plots
-        '''
+        Args:
+            x_name (str): x data column name
+            y_name (str): y  data column name
+            model_func ([type]): model to be fitted
+            alpha (float, optional): alpha value for confidence level. Defaults to 0.01.
+            whisker_plot (bool, optional): Whether to add whisker plot. Defaults to True.
+            bins (Union[int,float,np.ndarray], optional): how to determine the bins . Defaults to None.
+                - int: number or bins
+                - float: multiple of max(x_data) 
+                - nd.array: 
+            xlab (str, optional): label for x-axis. Defaults to None.
+            ylab (str, optional): label for y-axis. Defaults to None.
+
+        Returns:
+            CFCalcForCI_Plots: returns the calculations object.
+        """
+        # initialising
         x_data = self._asdf[x_name].values 
         y_data = self._asdf[y_name].values
-        asdf = self._asdf
-        parameters, covariance = curve_fit(model_func, x_data , y_data)
-        sigma_ab = np.sqrt(np.diagonal(covariance))
-        # the covariance can be used for parameter estimation 
-        # e.g. for parameter 1, the values are between:
-        #           paramaters[0]- covariance[0,0]**2*tval 
-        # and 
-        #           paramaters[0]+ covariance[0,0]**2*tval 
-        # (tval: is the student-t value for the dof and confidence level)
-        # see
-        # - https://kitchingroup.cheme.cmu.edu/blog/2013/02/12/Nonlinear-curve-fitting-with-parameter-confidence-intervals/
-        # - https://stackoverflow.com/questions/39434402/how-to-get-confidence-intervals-from-curve-fit
+        if bins is None:
+            bins = np.linspace(0, 1.1*np.max(x_data), num=10)
+        if isinstance(bins, int):
+            bins = np.linspace(0, 1.1*np.max(x_data), num=bins)
+        # performing calculations ====================================================
+        fpc = CFCalcForCI_Plots(x_data=x_data, y_data=y_data)
+        dict_params = fpc.calc_params(model_func=model_func)
+        dict_whisker = fpc.calc_whisker_plot(bins=bins)
+        dict_cis = fpc.calc_cis(num_points=101,alpha=alpha)
 
+        # plottting ==================================================================
         fig, axs = plt.subplots(1,1,figsize=PLT_FIGSIZE)
         if whisker_plot :
-            binsize = np.diff(bins).min()
-            x_bins = pd.cut(x_data, bins)
-            bins_centers =(bins[:-1] + bins[1:])/2
-            x_bc = (bins_centers[x_bins.codes]) #.astype(dtype='int')
-            x_bcu = np.unique(x_bc)
-            y_binned = []
-            for k in x_bcu :
-                y_binned.append(list(y_data[x_bc==k]))
-
             flier_kwargs = dict(marker = 'o', markerfacecolor = 'silver',
                                 markersize = 3, alpha=0.7)
             line_kwargs = dict(color = 'k', linewidth = 1)
-            bp = plt.boxplot( y_binned, positions=x_bcu ,
+            bp = plt.boxplot( list(dict_whisker['y_bin_data'].values()), positions=list(dict_whisker['y_bin_data'].keys()) ,
                             patch_artist=True,
                             capprops = line_kwargs,
                             boxprops = dict(color = 'k', linewidth = 1, facecolor='white', alpha=0.5),
                             whiskerprops = line_kwargs,
                             medianprops = line_kwargs,
                             flierprops = flier_kwargs,
-                            widths = binsize/3,
+                            widths = dict_whisker['binsize']/3,
                             manage_ticks = False)
 
         # plotting the model
-        hires_x = np.linspace(x_data.min(), x_data.max(), 100)
-        plt.plot(hires_x, model_func(hires_x, *parameters), 'black', label='model')
-        dof = len(y_data)-len(parameters)
-        tval = stats.t.ppf(1.0-alpha/2., dof)
-        bound_upper = model_func(hires_x, *(parameters + sigma_ab*tval))
-        bound_lower = model_func(hires_x, *(parameters - sigma_ab*tval))
+        plt.plot(dict_cis['x'], dict_cis['y'], 'black', label='model')
         # plotting the confidence intervals
-        plt.fill_between(hires_x, bound_lower, bound_upper,
+        plt.fill_between(dict_cis['x'], dict_cis['y_upper'], dict_cis['y_lower'],
                         color = 'black', alpha = 0.15)
 
-        plt.plot(x_data, y_data, '.', label='data', alpha=0.5)
+        plt.plot(fpc.x_data, fpc.y_data, '.', label='data', alpha=0.5)
+        parameters = dict_params.get('parameters')
+        sigma_ab= dict_params.get('sigma')
+        tval= dict_cis.get('t-statistic')
         text_res = "Best fit parameters:\na = {:.3g} $\\pm$ {:.3g} \nb = {:.3g} $\\pm$ {:.3g}".format(parameters[0],sigma_ab[0]*tval, parameters[1],sigma_ab[1]*tval)
-        t = plt.text(0.8*x_data.max(), 0.8*y_data.max(), text_res)
+        t = plt.text(0.8*fpc.x_data.max(), 0.8*fpc.y_data.max(), text_res)
         t.set_bbox(dict(facecolor='white', alpha=1, edgecolor='white'))
         plt.xlabel(xlab)
         plt.ylabel(ylab)
         plt.grid()
         plt.legend()
         # plt.axis('equal')
-
+        # plt.show()
+        return fpc
