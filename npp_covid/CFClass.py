@@ -26,7 +26,19 @@ class Data_Container():
         self._datadir = datadir
     
     def load_rawdatafile(self, fname):
+        """This works with Heroku (assumes 4 columns
+        - confirmed
+        - deaths
+        - pcr_tests
+        - rapid_tests)
+
+        Args:
+            fname ([type]): [description]
+        """
         self._df = pd.read_excel(pathlib.Path(self._datadir,fname), index_col='date', parse_dates=True)
+
+    def set_df(self, df:pd.DataFrame):
+        self._df = df
 
     def set_tests(self, tests_func:str=None):
         ''' Sets the tests (whether its pcr_tests+rapid_Tests or just pcr_tests)
@@ -131,6 +143,7 @@ class Data_Container():
             print("Could not save to file")
             print(type(err))
             print(err)
+    
     def sum_sqr_error_sm(self, col1_name:str="confirmed", col2_name:str="confirmed_smoothed"):
         """calculates and returns the sum of sqruare error of smoothing and raw data
     
