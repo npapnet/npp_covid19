@@ -362,10 +362,10 @@ class CF_plots_class():
         fig, axs = plt.subplots (2,1, figsize=PLT_FIGSIZE,sharex=True)
         hag_d= self._dc.hag_d
         hag_d.confirmed.plot(ax=axs[0])
-        axs[0].set_ylabel('PCR tests')
+        axs[0].set_ylabel('Confirmed cases []')
         axs[0].grid()
         hag_d.tests.plot(ax=axs[1])
-        axs[1].set_ylabel('PCR tests')
+        axs[1].set_ylabel('Tests []')
         axs[1].grid()
 
 
@@ -374,11 +374,11 @@ class CF_plots_class():
         fig, axs = plt.subplots (2,1, figsize=PLT_FIGSIZE,sharex=True)
         hag_d.confirmed.plot(ax=axs[0], lw=0, marker='.')
         hag_d.confirmed_smoothed.plot(ax=axs[0])
-        axs[0].set_ylabel('confirmed cases')
+        axs[0].set_ylabel('Confirmed cases []')
         axs[0].grid()
         hag_d.tests.plot(ax=axs[1], lw=0, marker='.')
         hag_d.tests_sm.plot(ax=axs[1])
-        axs[1].set_ylabel('PCR tests')
+        axs[1].set_ylabel('Tests []')
         axs[1].grid()
         axs[1].set_ylim([0,(hag_d.tests.max()//5000+1)*5000])    
 
@@ -540,9 +540,10 @@ class CF_analysis_plots():
         parameters = dict_params.get('parameters')
         sigma_ab= dict_params.get('sigma')
         tval= dict_cis.get('t-statistic')
-        text_res = "Best fit parameters:\na = {:.3g} $\\pm$ {:.3g} \nb = {:.3g} $\\pm$ {:.3g}".format(parameters[0],sigma_ab[0]*tval, parameters[1],sigma_ab[1]*tval)
-        for k in range(1, parameters.shape[0])
-        text_res += "\nc = {:.3g} $\\pm$ {:.3g}".format(parameters[2],sigma_ab[2]*tval)
+        # text_res = "Best fit parameters:\na0 = {:.3g} $\\pm$ {:.3g} \nb = {:.3g} $\\pm$ {:.3g}".format(parameters[0],sigma_ab[0]*tval, parameters[1],sigma_ab[1]*tval)
+        text_res = "Best fit parameters:\na0 = {:.3g} $\\pm$ {:.3g} ".format(parameters[0],sigma_ab[0]*tval)
+        for k in range(1, parameters.shape[0]):
+            text_res += "\na{} = {:.3g} $\\pm$ {:.3g}".format(k,parameters[k],sigma_ab[k]*tval)
         t = plt.text(0.8*fpc.x_data.max(), 0.8*fpc.y_data.max(), text_res)
         t.set_bbox(dict(facecolor='white', alpha=1, edgecolor='white'))
         plt.xlabel(xlab)
