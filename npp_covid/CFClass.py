@@ -500,6 +500,7 @@ class CF_analysis_plots():
         Returns:
             CFCalcForCI_Plots: returns the calculations object.
         """
+        # TODO: change x_name to be able to receive str and pd.Series
         # initialising
         x_data = self._asdf[x_name].values 
         y_data = self._asdf[y_name].values
@@ -540,6 +541,8 @@ class CF_analysis_plots():
         sigma_ab= dict_params.get('sigma')
         tval= dict_cis.get('t-statistic')
         text_res = "Best fit parameters:\na = {:.3g} $\\pm$ {:.3g} \nb = {:.3g} $\\pm$ {:.3g}".format(parameters[0],sigma_ab[0]*tval, parameters[1],sigma_ab[1]*tval)
+        for k in range(1, parameters.shape[0])
+        text_res += "\nc = {:.3g} $\\pm$ {:.3g}".format(parameters[2],sigma_ab[2]*tval)
         t = plt.text(0.8*fpc.x_data.max(), 0.8*fpc.y_data.max(), text_res)
         t.set_bbox(dict(facecolor='white', alpha=1, edgecolor='white'))
         plt.xlabel(xlab)
@@ -549,3 +552,5 @@ class CF_analysis_plots():
         # plt.axis('equal')
         # plt.show()
         return fpc
+
+# %%
