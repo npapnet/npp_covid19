@@ -67,6 +67,9 @@ class Data_Container():
         self.hag_d = dfcp
         return dfcp
 
+    def get_tests_average(self):
+        return self.hag_d['tests'].mean()
+
     def data_cleanup(self, cleanup_func)->pd.DataFrame:
         """Function that performs the cleanup. uses a user supplied function
 
@@ -312,19 +315,22 @@ class CF_plots_class():
         hag_d['confirmed'].plot(lw=0, marker='.')    
         hag_d['confirmed_smoothed'].plot()
 
-    def weekday_boxplot(self, data_series_name:str, save_to_file:bool=False):
+    def weekday_boxplot(self, data_series_name:str, save_to_file:bool=None, x_label:str=None):
         """ Function that produces a boxplot and saves the data
 
         Args:
             ds (pd.Series): series with index a DateTimeIndex.
+            xlab (str, optional): title of xlab Defaults to None which is equal to data_series_name
             save_to_file (bool, optional): set to true to save into a file. Defaults to False.
         """
         WEEKDAYS = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
-        
+                
         name_str = data_series_name
+        x_label = name_str if x_label is None else x_label
+        
         df = self._dc.process_weekly_Series(data_series_name=data_series_name)
-        if save_to_file:
-            df.to_excel(pathlib.Path(RAW_DATA_DIRNAME, PROC_FNAME.replace('.', '_boxplot.')))
+        # if save_to_file:
+        #     df.to_excel(pathlib.Path(RAW_DATA_DIRNAME, PROC_FNAME.replace('.', '_boxplot.')))
         # plotting
         fig,axs=plt.subplots(1,1,figsize=PLT_FIGSIZE)
         df.boxplot(column='normalized_{}'.format(name_str), by = 'weekday', ax =axs, fontsize=16,
@@ -332,9 +338,9 @@ class CF_plots_class():
             boxprops = dict(color = 'k', linewidth = 1, facecolor='white', alpha=1),
             patch_artist=True
             )
-        axs.set_ylabel('{} normalised wrt to  week average'.format(name_str),fontsize=16)
+        axs.set_ylabel('{} normalised wrt to  week average'.format(x_label),fontsize=16)
         axs.set_xlabel('Weekday',fontsize=16)
-        axs.set_title('{} normalised wrt to week average vs. weekday ({} weeks) '.format(name_str, df['week_no'].max()), fontsize=20)
+        axs.set_title('{} normalised wrt to week average vs. weekday ({} weeks) '.format(x_label, df['week_no'].max()), fontsize=20)
         plt.xticks(list(range(1,8)), WEEKDAYS)
 
     def plot_tests_pertype_log_scale(self):
@@ -344,6 +350,7 @@ class CF_plots_class():
         hag_dcp['rapid_tests'].plot(lw=0, marker='.', logy=True)
         plt.ylabel('no of performed tests  in log scale' )
         plt.grid()
+        plt.legend()
         plt.title('Rapid and PCR tests in log scale' )
 
     def check_smoothing_linearity_confirmed(self):
@@ -385,7 +392,7 @@ class CF_plots_class():
     def get_columns(self):
         return self._dc.hag_d.columns
 
-    def visualize_heatmap_ks(self, data_series_name, figsize=(16,10), fontsize = 14):
+    def visualize_heatmap_ks(self, data_series_name, figsize=(16,10), fontsize = 14, plot_label:str=None):
         """produces a tringular heatmap with color coded 
 
         Args:
@@ -395,29 +402,45 @@ class CF_plots_class():
         mask = np.zeros_like(data)
         triangle_indices = np.triu_indices_from(mask)
         mask[triangle_indices]=1
+
+        # plotting
+        plot_label = data_series_name if plot_label is None else plot_label 
+
         plt.figure(figsize=figsize)
-        sns.heatmap(data, mask =mask, annot=True, annot_kws={'size':14}, norm=LogNorm())
+        sns.heatmap(data, mask =mask, annot=True, annot_kws={'size':14}#, norm=LogNorm()
+            )
         sns.set_style('white')
         WEEKDAYS = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
         posx, textvals = plt.xticks()
         posy, textvals = plt.yticks()
         plt.xticks(posx, WEEKDAYS, ha='center', fontsize = fontsize)
         plt.yticks(posy, WEEKDAYS, va='center', fontsize = fontsize)    
-
+        plt.title(plot_label,fontsize = fontsize+3)
 class CF_analysis_plots():
-    def __init__(self, asdf):
+    def __init__(self, asdf, type_of_tests:str = None):
+        """[summary]
+
+        Args:
+            asdf ([type]): dataseries
+            type_of_tests (str): This should be either "total" or "RT-PCR"
+        """        
         self._asdf= asdf
+        try:
+            assert type_of_tests in ['total', 'RT-PCR']
+        except AssertionError as e:
+            raise Exception('type_of_tests (str): This should be either "total" or "RT-PCR"')
+        self._tests_str = type_of_tests
         
     def npr_vs_tests(self):
         
         plt.figure(figsize=PLT_FIGSIZE)
         plt.plot(self._asdf.tests, self._asdf.conf_ratio,'.')
-        plt.xlabel('no of tests []')
+        plt.xlabel('no of {} tests []'.format(self._tests_str))
         plt.ylabel('Confirmed normalised w.r.t. to smoothed confirmed $\\frac{actual}{smoothed}$')
         # plt.xlim([0,2])
         # plt.ylim([0,3])
         plt.grid()
-        plt.title('Normalised confirmed cases vs tests ')
+        plt.title('Normalised confirmed cases vs {} tests'.format(self._tests_str))
 
     def pr_vs_spr(self):
         
@@ -430,29 +453,31 @@ class CF_analysis_plots():
         # plt.xlim([0,2])
         # plt.ylim([0,3])
         axs.grid()
-        axs.set_title('Positive Rate (PR) and Smoothed Positive Rate (SPR)')
-    
+        title_str = 'Positive Rate (PR) and Smoothed Positive Rate (SPR)'
+        title_str += "\n based on {} tests".format(self._tests_str)
+        axs.set_title(title_str)
+        
     def npr_vs_tr(self):
         fig, axs = plt.subplots(1,1, figsize=PLT_FIGSIZE)
-        axs.plot(asdf.ratio_tests, asdf.ratio_pos_idx,'.')
+        axs.plot(self._asdf.ratio_tests, self._asdf.ratio_pos_idx,'.')
         axs.set_xlabel(r'test ratio $\left[\frac{actual}{smoothed}\right]$')
         axs.set_ylabel('Normalised positive rate $\\left[\\frac{raw }{smoothed}\\right]$')
         axs.set_xlim([0,2])
         axs.set_ylim([0,3])
         axs.set_aspect('equal')
         axs.grid()
-        axs.set_title('Normalised positive rate vs test ratio')
+        axs.set_title('Normalised positive rate vs test ratio ({})'.format(self._tests_str))
 
     def npr_vs_tests(self):
         
         fig, axs = plt.subplots(1,1, figsize=PLT_FIGSIZE)
         axs.plot(self._asdf.tests, self._asdf.ratio_pos_idx,'.')
-        axs.set_xlabel('no of tests []')
+        axs.set_xlabel('no of {} tests []'.format(self._tests_str))
         axs.set_ylabel('Normalised positive rate $\\frac{actual}{smoothed}$')
         # plt.xlim([0,2])
         # plt.ylim([0,3])
         axs.grid()
-        axs.set_title('Normalised Positive Rate vs no of total tests')
+        axs.set_title('Normalised Positive Rate vs no of {} tests'.format(self._tests_str))
 
     # def npr_vs_pcr(self):
     #     fig, axs = plt.subplots(1,1, figsize=PLT_FIGSIZE)
