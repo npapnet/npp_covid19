@@ -15,6 +15,8 @@ import seaborn as sns
 import  statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
+from npp_covid.CFClass import PLT_FIGSIZE
+
 
 def visualize_correlations(data, figsize=(16,10), fontsize = 14):
     """produces a tringular heatmap with color coded 
@@ -32,26 +34,59 @@ def visualize_correlations(data, figsize=(16,10), fontsize = 14):
     plt.yticks(fontsize = fontsize)
 
 class ModelContainer():
+    """This is a Monte Carlo model container"""
+
     def __init__(self, features, target):
         self.features = features
         self.target = target
     
 
     def split_data(self, random_state=None, test_size=0.2):
+        """splits data into different states
+
+        ## Splitting of the dataset
+        The features are broken up into train and split at a ratio of 8:2.
+        - $X_{train}$ 
+        - $y_{train}$
+        - $X_{test}$ 
+        - $y_{test}$
+
+        the train data are used for the derivation of the constants of the model, while the tests are reserved for 
+
+
+        Args:
+            random_state ([type], optional): random seed. Defaults to None.
+            test_size (float, optional): fraction of data to be assigned to test. Defaults to 0.2.
+        """        
         self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(self.features, self.target, 
             test_size=test_size, random_state=random_state)
 
     def prepare_model(self):
+        """Prepares a linear regression model 
+
+        Returns:
+            [type]: [description]
+        """
         self.regr = LinearRegression().fit(self.X_train, self.Y_train)
         # fitted_vals= self.regr.predict(self.X_train)
         return self.regr
     
     def prepare_OLSmodel(self):
+        """Prepare an Ordinary Least Squares model with **statsmodels.api**
+
+        Returns:
+            [type]: OLS results from the fitting.
+        """
         X_incl_const = sm.add_constant(self.X_train)
         self.OLS_results = sm.OLS(self.Y_train, X_incl_const).fit()
         return self.OLS_results
 
     def p_values(self):
+        """returns the p values from the OLS model
+
+        Returns:
+            [type]: [description]
+        """
         results = self.OLS_results
 
         #results params
@@ -61,6 +96,11 @@ class ModelContainer():
             })
 
     def variance_inflation_factors(self):
+        """Returns the Variance inflation factors for the feature set
+
+        Returns:
+            [type]: [description]
+        """        
         # from statsmodels.stats.outliers_influence import variance_inflation_factor
         X_incl_const = sm.add_constant(self.X_train)
         vifs = []
@@ -84,7 +124,7 @@ class ModelContainer():
         # graph of actual vs predicted prices
         Y_train= self.Y_train
         corr = Y_train.corr(results.fittedvalues)
-        plt.figure()
+        fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
         print("Corr between actual and predicted: {:.2f}".format(corr))
         plt.scatter(x=Y_train, y=results.fittedvalues, c='navy', alpha=0.6)
         plt.plot(Y_train, Y_train, c='cyan') # strain line
@@ -94,19 +134,19 @@ class ModelContainer():
         # plt.plot(Y_train, results.resid, '.')
 
         ## residulavs vs. Predicted values
-        plt.figure()
+        fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
         plt.scatter(x=results.fittedvalues, y= results.resid, c='blue', alpha=0.6)
         plt.xlabel('Predicted  $\hat{y}_{i}$', fontsize = 14)
         plt.ylabel('Residuals', fontsize = 14)
         plt.title(f'Residuals vs Fitted Values', fontsize=17)
 
         # distributon of residuals  - checking for nomrality
-        # fig, ax = plt.subplots()
+        # fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
         resid_mean = round (results.resid.mean(),3)
         resid_skew = round (results.resid.skew(),3)
         # sns.displot(results.resid, color = 'navy',kind='kde', ax=ax)
         sns.displot(results.resid, color = 'navy',kind='hist', kde=True, rug=True)
-        plt.title(f'price model: residuals Skew:({resid_skew}) Mean: ({resid_mean})')
+        plt.title(f'model: residuals Skew:({resid_skew}) Mean: ({resid_mean})')
 
 
 
