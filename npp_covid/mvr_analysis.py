@@ -36,7 +36,7 @@ def visualize_correlations(data, figsize=(16,10), fontsize = 14):
 class ModelContainer():
     """This is a Monte Carlo model container"""
 
-    def __init__(self, features, target):
+    def __init__(self, features, target, metadata:dict=None):
         self.features = features
         self.target = target
     
@@ -74,6 +74,13 @@ class ModelContainer():
     def prepare_OLSmodel(self):
         """Prepare an Ordinary Least Squares model with **statsmodels.api**
 
+        This has additional information for 
+        - residuals 
+        - p-values
+
+        
+        that can be used
+
         Returns:
             [type]: OLS results from the fitting.
         """
@@ -82,7 +89,8 @@ class ModelContainer():
         return self.OLS_results
 
     def p_values(self):
-        """returns the p values from the OLS model
+        """returns the p values from the OLS model 
+        (requires OLS Model)
 
         Returns:
             [type]: [description]
@@ -111,17 +119,37 @@ class ModelContainer():
         return dvifs
 
     def gen_paiplot(self, fname=None):    # %% save to disk pairplot
+        """This is a function that generates  a pairplot and saves into a file
+        Takes a long time to process. 
+
+        Args:
+            fname ([type], optional): [description]. Defaults to None.
+        """
         sns_plot = sns.pairplot(self.features,  kind ='reg',plot_kws={'line_kws':{'color':'red'}, 'scatter_kws': {'alpha': 0.4}})
         sns_plot.savefig(fname)
     
-    def plot_residuals(self):
-        plt.figure()
+    def plot_normalised_residuals(self):
+        """Plot normalised residuals
+        (requires OLS Model)
+
+        $$resid_i = \\frac{y_i-\hat{y}_i}{y_i}$$
+        """        
         results = self.OLS_results
+
+        fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
+
         tmp = (results.resid/self.Y_train).sort_index()
-        tmp.plot()
+        axs.plot(tmp.index, tmp.values, '.')
+        axs.set_ylabel('Normalised residuals')
+        axs.grid()
+        axs.legend()
 
-
-        # graph of actual vs predicted prices
+    def plot_predicted_vs_target(self):
+        """graph of actual (y_i) vs predicted prices ($\hat{y}_i$)
+        (requires OLS Model)
+        """        
+        # 
+        results = self.OLS_results
         Y_train= self.Y_train
         corr = Y_train.corr(results.fittedvalues)
         fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
@@ -132,25 +160,37 @@ class ModelContainer():
         plt.ylabel('Predicted  $\hat{y}_{i}$', fontsize = 14)
         plt.title(f'Actual vs preidcted  : $y_i - \hat y_i$ (Corr: {corr:.2f})', fontsize=17)
         # plt.plot(Y_train, results.resid, '.')
-
-        ## residulavs vs. Predicted values
+    
+    def plot_residuals_vs_predicted(self):
+        """graph of resid ($y_i-\hat{y}_i$) vs predicted prices ($\hat{y}_i$)
+        (requires OLS Model)
+        """            
+        results = self.OLS_results
+        ## residual vs vs. Predicted values
         fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
         plt.scatter(x=results.fittedvalues, y= results.resid, c='blue', alpha=0.6)
         plt.xlabel('Predicted  $\hat{y}_{i}$', fontsize = 14)
         plt.ylabel('Residuals', fontsize = 14)
         plt.title(f'Residuals vs Fitted Values', fontsize=17)
 
-        # distributon of residuals  - checking for nomrality
-        # fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
+    def plot_residuals_distribution(self):
+        """Plot distribution of residual and reports skewness values
+        (requires OLS Model)
+        """
+        results = self.OLS_results
+        # distributon of residuals  - checking for normality
         resid_mean = round (results.resid.mean(),3)
         resid_skew = round (results.resid.skew(),3)
+        fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
         # sns.displot(results.resid, color = 'navy',kind='kde', ax=ax)
-        sns.displot(results.resid, color = 'navy',kind='hist', kde=True, rug=True)
+        sns.displot(results.resid, color = 'navy',kind='hist', kde=True, rug=True, ax=axs)
         plt.title(f'model: residuals Skew:({resid_skew}) Mean: ({resid_mean})')
 
-
-
     def plot_correlations(self):
+        """plots a heatmap with the correlations of features.
+        depends on:
+        - visualize_correlations function
+        """
         visualize_correlations(self.features)
 
     def mc_score(self, n = 100, random_state=None):
@@ -181,5 +221,7 @@ class ModelContainer():
         
         return pd.DataFrame(res, columns=['train', 'test'])
 
+
+# %%
 
 # %%
