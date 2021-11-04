@@ -55,3 +55,83 @@ def prepare_cases_gaussian(new_cases ,
     # original = new_cases.loc[smoothed.index]
     
     return  smoothed
+
+
+#%%
+def smooth_func_factory(periods_count:int=15, stds:float=4, init_val:int=100, window_type='gaussian'):
+    """Factory function. produces a smooth function parametrically
+
+    Args:
+        periods_count (int, optional): periods . Defaults to 15.
+        stds (float, optional): stds for the gaussian. Defaults to 4.
+        init_val (int, optional): Threshold value of the smoothed to keep. Defaults to 100.
+    """
+
+    def smooth_f_g(new_cases:pd.Series)-> pd.Series:
+        """smooth function. smooths and returns the first value past a number
+
+        Args:
+            new_cases (pd.Series): [description]
+            periods_count (int, optional): [description]. Defaults to 15.
+            stds (int, optional): [description]. Defaults to 4.
+            init_val (int, optional): [description]. Defaults to 25.
+
+        Returns:
+            pd.Series: [description]
+        """    
+        '''smooth function'''
+        smoothed = new_cases.rolling(window=periods_count,
+            win_type='gaussian', min_periods=1,
+            center=True).mean(std=stds).round()
+
+        init_index  = np.argmax(smoothed>init_val)
+        return smoothed[init_index:]
+
+    def smooth_f_tri(new_cases:pd.Series)-> pd.Series:
+        """smooth function. smooths and returns the first value past a number
+
+        Args:
+            new_cases (pd.Series): [description]
+            periods_count (int, optional): [description]. Defaults to 15.
+            stds (int, optional): [description]. Defaults to 4.
+            init_val (int, optional): [description]. Defaults to 25.
+
+        Returns:
+            pd.Series: [description]
+        """    
+        '''smooth function'''
+        smoothed = new_cases.rolling(window=periods_count,
+            win_type='triang', min_periods=1,
+            center=True).mean().round()
+
+        init_index  = np.argmax(smoothed>init_val)
+        return smoothed[init_index:]
+
+    def smooth_f_owid(new_cases:pd.Series)-> pd.Series:
+        """smooth function. smooths and returns the first value past a number
+
+        Args:
+            new_cases (pd.Series): [description]
+            periods_count (int, optional): [description]. Defaults to 15.
+            stds (int, optional): [description]. Defaults to 4.
+            init_val (int, optional): [description]. Defaults to 25.
+
+        Returns:
+            pd.Series: [description]
+        """    
+        '''smooth function'''
+        smoothed = new_cases.rolling(window=7,
+            center=False).mean().round()
+
+        init_index  = np.argmax(smoothed>init_val)
+        return smoothed[init_index:]
+
+
+    f_dict = {'gaussian': smooth_f_g, 
+        'tri': smooth_f_tri,
+        'owid': smooth_f_owid}
+    
+    return f_dict.get(window_type, smooth_f_g)
+
+
+

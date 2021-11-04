@@ -78,7 +78,6 @@ class ModelContainer():
         - residuals 
         - p-values
 
-        
         that can be used
 
         Returns:
@@ -105,6 +104,17 @@ class ModelContainer():
 
     def variance_inflation_factors(self):
         """Returns the Variance inflation factors for the feature set
+
+        ## Multicollinearity - Correlation of variables
+        The following section is concerned with the collinearity of the variables, 
+        which can have a negative impact on the performance of the model. 
+        One way to determine it is by creating a map of the correlation of the features presented in the form of heatmap below. 
+         
+        High values of correlation between variables i and j (Close to 1) would mean that the two variables have similar trends
+        therefore there is little gain in including both of them.
+        
+        **NOTE:** it would be interesting to see if the removal of one of the variables 
+        indeed benefits or not the model. 
 
         Returns:
             [type]: [description]
@@ -176,6 +186,11 @@ class ModelContainer():
     def plot_residuals_distribution(self):
         """Plot distribution of residual and reports skewness values
         (requires OLS Model)
+        ## Model Performance - skewness
+        # This section measures the skewness of the variables (this is to test how symmetric and close to the normal distrubtion is the model)
+        # Ideal values would be close to zero. Sometimes a threshold value of ?? is considered (TODO: check this value).
+        # 
+        # In this type of data, some level of skewness is expected. Therefore, a log transformation is also considered and printed. 
         """
         results = self.OLS_results
         # distributon of residuals  - checking for normality
@@ -203,6 +218,31 @@ class ModelContainer():
             random_state ([type], optional): [description]. Defaults to None.
         """        
         def perform_single_sim(features, target):
+            """ Splitting of the dataset
+            The features are broken up into train and split at a ratio of 8:2.
+            - $X_{train}$ 
+            - $y_{train}$
+            - $X_{test}$ 
+            - $y_{test}$
+            
+            the train data are used for the derivation of the constants of the model, 
+            while the tests are reserved for 
+            
+            # Linear regression
+            A linear regression model is created and fitted. 
+            the model is then used to:
+            - predict the fitted values for the train model (? why )
+            - score the train data
+            - score the test data
+
+            Args:
+                features ([type]): [description]
+                target ([type]): [description]
+
+            Returns:
+                [type]: [description]
+            """            
+            
             X_train, X_test, Y_train, Y_test = train_test_split(features, target, test_size=0.2)#, random_state=10)
             regr = LinearRegression().fit(X_train, Y_train)
             fitted_vals= regr.predict(X_train)
