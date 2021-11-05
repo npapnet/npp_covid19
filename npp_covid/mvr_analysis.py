@@ -39,7 +39,8 @@ class ModelContainer():
     def __init__(self, features, target, metadata:dict=None):
         self.features = features
         self.target = target
-    
+        self.metadata = metadata
+        self.model_name = self.metadata.get('feature_func',"").__name__[-2:]
 
     def split_data(self, random_state=None, test_size=0.2):
         """splits data into different states
@@ -63,7 +64,7 @@ class ModelContainer():
 
     def prepare_model(self):
         """Prepares a linear regression model 
-
+        TODO: check if this is obsolete
         Returns:
             [type]: [description]
         """
@@ -151,10 +152,13 @@ class ModelContainer():
         tmp = (results.resid/self.Y_train).sort_index()
         axs.plot(tmp.index, tmp.values, '.')
         axs.set_ylabel('Normalised residuals')
+        axs.set_xlabel('Date')
         axs.grid()
         axs.legend()
 
-    def plot_predicted_vs_target(self):
+        axs.set_title('Normalised residulas for model {}'.format(self.model_name))
+
+    def plot_predicted_vs_target(self, fontsize=14):
         """graph of actual (y_i) vs predicted prices ($\hat{y}_i$)
         (requires OLS Model)
         """        
@@ -162,13 +166,18 @@ class ModelContainer():
         results = self.OLS_results
         Y_train= self.Y_train
         corr = Y_train.corr(results.fittedvalues)
+        y_test_predict = self.OLS_results.predict(sm.add_constant(self.X_test))
+
         fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
-        print("Corr between actual and predicted: {:.2f}".format(corr))
+        # print("Corr between actual and predicted: {:.2f}".format(corr))
         plt.scatter(x=Y_train, y=results.fittedvalues, c='navy', alpha=0.6)
+        plt.plot(self.Y_test, y_test_predict, 'g.', alpha=0.6, label='test')
         plt.plot(Y_train, Y_train, c='cyan') # strain line
-        plt.xlabel('actual  $y_{i}$', fontsize = 14)
-        plt.ylabel('Predicted  $\hat{y}_{i}$', fontsize = 14)
-        plt.title(f'Actual vs preidcted  : $y_i - \hat y_i$ (Corr: {corr:.2f})', fontsize=17)
+        plt.xlabel('actual  $y_{i}$', fontsize = fontsize)
+        plt.ylabel('Predicted  $\hat{y}_{i}$', fontsize = fontsize)
+        plt.title(f'Actual vs predicted  : $y_i - \hat y_i$ (Corr: {corr:.2f})', fontsize=fontsize+3)
+        plt.grid()
+        plt.legend()
         # plt.plot(Y_train, results.resid, '.')
     
     def plot_residuals_vs_predicted(self):
@@ -181,6 +190,7 @@ class ModelContainer():
         plt.scatter(x=results.fittedvalues, y= results.resid, c='blue', alpha=0.6)
         plt.xlabel('Predicted  $\hat{y}_{i}$', fontsize = 14)
         plt.ylabel('Residuals', fontsize = 14)
+        plt.grid()
         plt.title(f'Residuals vs Fitted Values', fontsize=17)
 
     def plot_residuals_distribution(self):
