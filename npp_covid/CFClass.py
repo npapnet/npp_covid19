@@ -19,15 +19,15 @@ PLT_FIGSIZE=(16,9)
 
 class CF_Data_Container(Data_Container):
     def generate_asdf(self):
-        hag_d = self.hag_d
+        hag_d = self.data
         self.asdf = pd.DataFrame({
             'conf': hag_d.confirmed,
             'tests': hag_d.tests,
-            'conf_ratio': hag_d.confirmed/hag_d.confirmed_smoothed,
-            'pos_idx': hag_d.confirmed/hag_d.tests*1000,
-            'sm_confirmed': hag_d.confirmed_smoothed,
+            'conf_ratio': hag_d.confirmed/hag_d.confirmed_sm,
+            'pos_idx': hag_d.pr,
+            'sm_confirmed': hag_d.confirmed_sm,
             'sm_tests': hag_d.tests_sm,
-            'sm_pos_idx': hag_d.conf_per_1000t_sm
+            'sm_pos_idx': hag_d.pr_sm
             }    )
         self.asdf.eval('ratio_pos_idx = pos_idx/sm_pos_idx', inplace=True)
         self.asdf.eval('ratio_tests=tests/sm_tests', inplace=True)
@@ -35,212 +35,8 @@ class CF_Data_Container(Data_Container):
         return self.asdf         
 
 
-class CFCalcForCI_Plots():
-    '''this is a complementary class  to CF calculation for the final plot
-    the reasoning that this is used to calculate and contain the data for the plot
-    and also to use the coefficients and model for the comparison plots.
-
-    Example usage:
-    - fpc = CFCalcForCI_Plots(x_data=asdf['tests'], y_data=asdf['ratio_pos_idx'])
-    - print(fpc.calc_params(model_func=hyperbolic))
-    - dic_whisk=fpc.calc_whisker_plot(bins = np.linspace(0, 4e5, 11))
-    - print(fpc.calc_cis())
-    '''
-    def __init__(self, x_data, y_data) -> None:
-        """Initialisation with data points
-
-        Args:
-            x_data ([type]): x-axis data
-            y_data ([type]): y-axis data
-        """
-        self.x_data = np.asarray(x_data)
-        self.y_data = np.asarray(y_data)
-
-    def calc_params(self, model_func):
-        """Parameter calculation
-
-        Args:
-            model_func (function): a function to be fitted with the model 
-
-        Returns:
-            dict: {'parameters': ``nd.array``, 'cov':``nd.array``, 'sigma':``nd.array``, 'model_name':``str``}
-        """
-        self.model_func = model_func
-        self.parameters, self.covariance = curve_fit(model_func, self.x_data , self.y_data)
-        self.sigma_ab = np.sqrt(np.diagonal(self.covariance))
-        return {'parameters':self.parameters, 'cov':self.covariance, 'sigma':self.sigma_ab, 'model_name':model_func.__name__}
-        # the covariance can be used for parameter estimation 
-        # e.g. for parameter 1, the values are between:
-        #           paramaters[0]- covariance[0,0]**2*tval 
-        # and 
-        #           paramaters[0]+ covariance[0,0]**2*tval 
-        # (tval: is the student-t value for the dof and confidence level)
-        # see
-        # - https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
-        # - https://kitchingroup.cheme.cmu.edu/blog/2013/02/12/Nonlinear-curve-fitting-with-parameter-confidence-intervals/
-        # - https://stackoverflow.com/questions/39434402/how-to-get-confidence-intervals-from-curve-fit
-
-    def calc_whisker_plot(self, bins):
-        """calculates the whisker plot data.
-
-        Args:
-            bins ([type]): [description]
-
-        Returns:
-            [type]: [description]
-        """
-
-        binsize = np.diff(bins).min()
-        x_bins = pd.cut(self.x_data, bins)
-        bins_centers =(bins[:-1] + bins[1:])/2
-        x_bc = (bins_centers[x_bins.codes]) #.astype(dtype='int')
-        x_bcu = np.unique(x_bc)
-        y_binned = dict()
-        for k in x_bcu :
-            y_binned[k] = list(self.y_data[x_bc==k])
-        return {
-            'binsize': binsize,
-            'x_bins_all': x_bins,
-            'x_bin_centers': bins_centers,
-            'y_bin_data': y_binned 
-        }
-
-    def calc_cis(self, num_points:int=101, alpha:float=0.01):
-        """Calculates the data series for the ci plot
-
-        Args:
-            num_points (int, optional): number of equispaced datapoints. Defaults to 100.
-        """        
-        hires_x = np.linspace(self.x_data.min(), self.x_data.max(), num_points)
-        hires_y = self.model_func(hires_x, *self.parameters)
-        dof = len(self.y_data)-len(self.parameters)
-        tval = stats.t.ppf(1.0-alpha/2., dof)
-        bound_upper = self.model_func(hires_x, *(self.parameters + self.sigma_ab*tval))
-        bound_lower = self.model_func(hires_x, *(self.parameters - self.sigma_ab*tval))
-        self.dict_cis = {
-            'x': hires_x,
-            'y': hires_y,
-            'dof': dof,
-            't-statistic': tval,
-            'y_upper': bound_upper,
-            'y_lower':bound_lower
-        }
-        return self.dict_cis
-
 #%% Plot classes
 
-class CF_plots_class():
-    ''' This is a class that uses the Data Container object to plot information
-    '''
-    def __init__(self, dc:Data_Container):
-        self._dc = dc
-        
-    def plot_confirmed(self):
-        hag_d = self._dc.hag_d
-        hag_d['confirmed'].plot(lw=0, marker='.')    
-        hag_d['confirmed_smoothed'].plot()
-
-    def weekday_boxplot(self, data_series_name:str, save_to_file:bool=None, x_label:str=None):
-        """ Function that produces a boxplot and saves the data
-
-        Args:
-            ds (pd.Series): series with index a DateTimeIndex.
-            xlab (str, optional): title of xlab Defaults to None which is equal to data_series_name
-            save_to_file (bool, optional): set to true to save into a file. Defaults to False.
-        """
-        WEEKDAYS = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
-                
-        name_str = data_series_name
-        x_label = name_str if x_label is None else x_label
-        
-        df = self._dc.process_weekly_Series(data_series_name=data_series_name)
-        # if save_to_file:
-        #     df.to_excel(pathlib.Path(RAW_DATA_DIRNAME, PROC_FNAME.replace('.', '_boxplot.')))
-        # plotting
-        fig,axs=plt.subplots(1,1,figsize=PLT_FIGSIZE)
-        df.boxplot(column='normalized_{}'.format(name_str), by = 'weekday', ax =axs, fontsize=16,
-            color =  dict(boxes="black", whiskers="black", medians="green", caps="Gray"), grid=True,
-            boxprops = dict(color = 'k', linewidth = 1, facecolor='white', alpha=1),
-            patch_artist=True
-            )
-        axs.set_ylabel('{} normalised wrt to  week average'.format(x_label),fontsize=16)
-        axs.set_xlabel('Weekday',fontsize=16)
-        axs.set_title('{} normalised wrt to week average vs. weekday ({} weeks) '.format(x_label, df['week_no'].max()), fontsize=20)
-        plt.xticks(list(range(1,8)), WEEKDAYS)
-
-    def plot_tests_pertype_log_scale(self):
-        hag_dcp = self._dc.hag_d
-        fig,axs = plt.subplots(1,1, figsize=PLT_FIGSIZE)
-        hag_dcp['pcr_tests'].plot(lw=0, marker='.', logy=True)
-        hag_dcp['rapid_tests'].plot(lw=0, marker='.', logy=True)
-        plt.ylabel('no of performed tests  in log scale' )
-        plt.grid()
-        plt.legend()
-        plt.title('Rapid and PCR tests in log scale' )
-
-    def check_smoothing_linearity_confirmed(self):
-
-        fig,axs = plt.subplots(2,1, figsize=(10,10))
-        plt.title('confirmed vs smoothed confirmed \n(check smoothing linearity)')
-        self._dc.hag_d.plot.scatter(x='confirmed',y='confirmed_smoothed', logy=False, logx=False, xlim=[1, 1e4], ax=axs[0])
-        plt.axis('equal')
-        plt.grid()
-        self._dc.hag_d.plot.scatter(x='confirmed',y='confirmed_smoothed', logy=True, logx=True, xlim=[1, 1e4], ylim=[1, 1e4], ax=axs[1])
-        plt.axis('equal')
-        plt.grid()
-
-
-    def plot_figure_showing_problem(self):
-        fig, axs = plt.subplots (2,1, figsize=PLT_FIGSIZE,sharex=True)
-        hag_d= self._dc.hag_d
-        hag_d.confirmed.plot(ax=axs[0])
-        axs[0].set_ylabel('Confirmed cases []')
-        axs[0].grid()
-        hag_d.tests.plot(ax=axs[1])
-        axs[1].set_ylabel('Tests []')
-        axs[1].grid()
-
-
-    def plot_figure_smoothing(self):
-        hag_d= self._dc.hag_d 
-        fig, axs = plt.subplots (2,1, figsize=PLT_FIGSIZE,sharex=True)
-        hag_d.confirmed.plot(ax=axs[0], lw=0, marker='.')
-        hag_d.confirmed_smoothed.plot(ax=axs[0])
-        axs[0].set_ylabel('Confirmed cases []')
-        axs[0].grid()
-        hag_d.tests.plot(ax=axs[1], lw=0, marker='.')
-        hag_d.tests_sm.plot(ax=axs[1])
-        axs[1].set_ylabel('Tests []')
-        axs[1].grid()
-        axs[1].set_ylim([0,(hag_d.tests.max()//5000+1)*5000])    
-
-    def get_columns(self):
-        return self._dc.hag_d.columns
-
-    def visualize_heatmap_ks(self, data_series_name, figsize=(16,10), fontsize = 14, plot_label:str=None):
-        """produces a tringular heatmap with color coded 
-
-        Args:
-            data ([type]): [description]
-        """    
-        data = self._dc.calculate_ks_2samp_for_week(data_series_name=data_series_name).T
-        mask = np.zeros_like(data)
-        triangle_indices = np.triu_indices_from(mask)
-        mask[triangle_indices]=1
-
-        # plotting
-        plot_label = data_series_name if plot_label is None else plot_label 
-
-        plt.figure(figsize=figsize)
-        sns.heatmap(data, mask =mask, annot=True, annot_kws={'size':14}#, norm=LogNorm()
-            )
-        sns.set_style('white')
-        WEEKDAYS = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
-        posx, textvals = plt.xticks()
-        posy, textvals = plt.yticks()
-        plt.xticks(posx, WEEKDAYS, ha='center', fontsize = fontsize)
-        plt.yticks(posy, WEEKDAYS, va='center', fontsize = fontsize)    
-        plt.title(plot_label,fontsize = fontsize+3)
 class CF_analysis_plots():
     def __init__(self, asdf, type_of_tests:str = None):
         """[summary]
@@ -405,3 +201,95 @@ class CF_analysis_plots():
         return fpc
 
 # %%
+
+class CFCalcForCI_Plots():
+    '''this is a complementary class  to CF calculation for the final plot
+    the reasoning that this is used to calculate and contain the data for the plot
+    and also to use the coefficients and model for the comparison plots.
+
+    Example usage:
+    - fpc = CFCalcForCI_Plots(x_data=asdf['tests'], y_data=asdf['ratio_pos_idx'])
+    - print(fpc.calc_params(model_func=hyperbolic))
+    - dic_whisk=fpc.calc_whisker_plot(bins = np.linspace(0, 4e5, 11))
+    - print(fpc.calc_cis())
+    '''
+    def __init__(self, x_data, y_data) -> None:
+        """Initialisation with data points
+
+        Args:
+            x_data ([type]): x-axis data
+            y_data ([type]): y-axis data
+        """
+        self.x_data = np.asarray(x_data)
+        self.y_data = np.asarray(y_data)
+
+    def calc_params(self, model_func):
+        """Parameter calculation
+
+        Args:
+            model_func (function): a function to be fitted with the model 
+
+        Returns:
+            dict: {'parameters': ``nd.array``, 'cov':``nd.array``, 'sigma':``nd.array``, 'model_name':``str``}
+        """
+        self.model_func = model_func
+        self.parameters, self.covariance = curve_fit(model_func, self.x_data , self.y_data)
+        self.sigma_ab = np.sqrt(np.diagonal(self.covariance))
+        return {'parameters':self.parameters, 'cov':self.covariance, 'sigma':self.sigma_ab, 'model_name':model_func.__name__}
+        # the covariance can be used for parameter estimation 
+        # e.g. for parameter 1, the values are between:
+        #           paramaters[0]- covariance[0,0]**2*tval 
+        # and 
+        #           paramaters[0]+ covariance[0,0]**2*tval 
+        # (tval: is the student-t value for the dof and confidence level)
+        # see
+        # - https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
+        # - https://kitchingroup.cheme.cmu.edu/blog/2013/02/12/Nonlinear-curve-fitting-with-parameter-confidence-intervals/
+        # - https://stackoverflow.com/questions/39434402/how-to-get-confidence-intervals-from-curve-fit
+
+    def calc_whisker_plot(self, bins):
+        """calculates the whisker plot data.
+
+        Args:
+            bins ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
+
+        binsize = np.diff(bins).min()
+        x_bins = pd.cut(self.x_data, bins)
+        bins_centers =(bins[:-1] + bins[1:])/2
+        x_bc = (bins_centers[x_bins.codes]) #.astype(dtype='int')
+        x_bcu = np.unique(x_bc)
+        y_binned = dict()
+        for k in x_bcu :
+            y_binned[k] = list(self.y_data[x_bc==k])
+        return {
+            'binsize': binsize,
+            'x_bins_all': x_bins,
+            'x_bin_centers': bins_centers,
+            'y_bin_data': y_binned 
+        }
+
+    def calc_cis(self, num_points:int=101, alpha:float=0.01):
+        """Calculates the data series for the ci plot
+
+        Args:
+            num_points (int, optional): number of equispaced datapoints. Defaults to 100.
+        """        
+        hires_x = np.linspace(self.x_data.min(), self.x_data.max(), num_points)
+        hires_y = self.model_func(hires_x, *self.parameters)
+        dof = len(self.y_data)-len(self.parameters)
+        tval = stats.t.ppf(1.0-alpha/2., dof)
+        bound_upper = self.model_func(hires_x, *(self.parameters + self.sigma_ab*tval))
+        bound_lower = self.model_func(hires_x, *(self.parameters - self.sigma_ab*tval))
+        self.dict_cis = {
+            'x': hires_x,
+            'y': hires_y,
+            'dof': dof,
+            't-statistic': tval,
+            'y_upper': bound_upper,
+            'y_lower':bound_lower
+        }
+        return self.dict_cis
