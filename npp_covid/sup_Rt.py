@@ -13,15 +13,16 @@ import matplotlib.pyplot as plt
 #%%
 
 class Rt_Calculator():
-    R_T_MAX = 6
-    r_t_num = 20
-    #GAMMA = 1/7
-    posteriors_p = 0.90
-    posteriors_sigma = 0.15
+    # R_T_MAX = 6
+    # r_t_num = 20
+    # #GAMMA = 1/7
+    # posteriors_p = 0.90
+    # posteriors_sigma = 0.15
 
-    def __init__(self, confirmed:pd.Series, smoothed=True):
+    def __init__(self, confirmed:pd.Series, is_smoothed=True):
         self._orig_backup = confirmed
-        if smoothed:
+        self.is_smoothed = is_smoothed
+        if self.is_smoothed:
             self.smoothed = confirmed
         else:
             self.smooth_clean()
@@ -52,11 +53,17 @@ class Rt_Calculator():
             R_T_MAX=self.processing_params.get('R_T_MAX'), 
             r_t_num=self.processing_params.get('r_t_num'), 
             GAMMA=self.processing_params.get('GAMMA'))
-        self.hdis = highest_density_interval(self.posteriors, p=self.posteriors_p)
+        self.hdis = highest_density_interval(self.posteriors, p=self.processing_params.get('posteriors_p') )
         most_likely = self.posteriors.idxmax().rename('ML')
         self.result = pd.concat([most_likely, self.hdis], axis=1)
         return self.result
+
     def get_df_cases(self):
+        """This is a convenience function for the plot_Rt
+
+        Returns:
+            [type]: [description]
+        """
         return pd.DataFrame({'original':self.raw, 'smoothed':self.smoothed})
 
 

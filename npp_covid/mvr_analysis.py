@@ -170,8 +170,9 @@ class ModelContainer():
 
         fig, axs = plt.subplots(1,1, figsize = PLT_FIGSIZE)
         # print("Corr between actual and predicted: {:.2f}".format(corr))
-        plt.scatter(x=Y_train, y=results.fittedvalues, c='navy', alpha=0.6)
-        plt.plot(self.Y_test, y_test_predict, 'g.', alpha=0.6, label='test')
+        # plt.scatter(x=Y_train, y=results.fittedvalues, c='navy', alpha=0.6)
+        plt.plot(self.Y_train, results.fittedvalues, 'bo', alpha=0.6, label='train')
+        plt.plot(self.Y_test, y_test_predict, 'g+', alpha=0.6, label='test')
         plt.plot(Y_train, Y_train, c='cyan') # strain line
         plt.xlabel('actual  $y_{i}$', fontsize = fontsize)
         plt.ylabel('Predicted  $\hat{y}_{i}$', fontsize = fontsize)
