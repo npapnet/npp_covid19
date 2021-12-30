@@ -67,7 +67,21 @@ class TS_Index_Checker():
         if not is_index_date_time(ds):
             raise(TypeError("Index type is not pd.DatetimeIndex"))
     
+    @property
+    def ds(self):
+        return self._ds
+ 
     def _analyze(self)-> dict:
+        """Returns a dictionary with some statistics for the time-series
+        
+
+        Returns:
+            dict: {
+                'length': original length.
+                'na': number of na in the time series
+                'largest_segment' : refers to the indexes of the **clean** ds
+            }
+        """        
         metadata = {}
         metadata['length'] = len(self._ds)
         metadata['na'] = self._ds.isna().sum()
@@ -108,6 +122,16 @@ def find_contiguous_segments(ds:pd.Series)->list:
     return segment_indxs
     
 def find_largest_contiguous_segment(ds:pd.Series)->list:
+    """returns the indexes of the largest continuous index
+
+    Args:
+        ds (pd.Series): requires a time series with na removed.
+
+    Returns:
+        list: the start and end index of the **clean** ds 
+    """    
+    if ds.isna().any():
+        raise ValueError(f'The time series should not contain na. There are {ds.isna().sum()} NaNs in the ds')
     all_segs = find_contiguous_segments(ds)
     index_len = 0
     max_len = 0 
