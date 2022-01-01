@@ -68,17 +68,20 @@ def test_analyze():
     
     oa = tsc.TS_Index_Checker(ds=ds)
     assert (oa._analyze() == {'length':15, 'na':0,
-                'largest_segment': [0,14]})
+                'largest_segment': [0,14],
+                'negative' : 0})
 
     ds2 = ds.replace(4,  np.nan)    
     oa = tsc.TS_Index_Checker(ds=ds2)
     assert (oa._analyze() == {'length':15, 'na':1,
-                'largest_segment': [4,13]})
+                'largest_segment': [4,13],
+                'negative' : 0})
     
     ds2a= ds2.dropna()
     oa = tsc.TS_Index_Checker(ds=ds2a)
     assert (oa._analyze() == {'length':14, 'na':0,
-                'largest_segment': [4,13]})
+                'largest_segment': [4,13],
+                'negative' : 0})
   
 
 def test_analyze_end():
@@ -89,14 +92,38 @@ def test_analyze_end():
     
     oa = tsc.TS_Index_Checker(ds=ds)
     assert (oa._analyze() == {'length':15, 'na':0,
-                'largest_segment': [0,14]})
+                'largest_segment': [0,14],
+                'negative' : 0})
 
     ds2 = ds.replace(14,  np.nan)    
     oa = tsc.TS_Index_Checker(ds=ds2)
     assert (oa._analyze() == {'length':15, 'na':1,
-                'largest_segment': [0,13]})
+                'largest_segment': [0,13],
+                'negative' : 0})
 
     ds2a= ds2.dropna()
     oa = tsc.TS_Index_Checker(ds=ds2a)
     assert (oa._analyze() == {'length':14, 'na':0,
-                'largest_segment': [0,13]})
+                'largest_segment': [0,13],
+                'negative' : 0})
+
+
+def test_analyze_negative():
+    """tests analyze function of TS_Index_Checker for negative data
+    """    
+    no_periods=15
+    ds = create_ds(no_periods)
+    
+    oa = tsc.TS_Index_Checker(ds=ds)
+
+    ds2 = ds.replace(14,  -1)    
+    oa = tsc.TS_Index_Checker(ds=ds2)
+    assert (oa._analyze() == {'length':15, 'na':0,
+                'largest_segment': [0,14],
+                'negative' : 1})
+
+    ds2a= ds2.replace(10,  -1) 
+    oa = tsc.TS_Index_Checker(ds=ds2a)
+    assert (oa._analyze() == {'length':15, 'na':0,
+                'largest_segment': [0,14],
+                'negative' : 2})

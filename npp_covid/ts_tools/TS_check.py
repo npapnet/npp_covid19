@@ -85,6 +85,7 @@ class TS_Index_Checker():
         metadata = {}
         metadata['length'] = len(self._ds)
         metadata['na'] = self._ds.isna().sum()
+        metadata['negative'] = (self.ds<0).sum()
         metadata['largest_segment'] = find_largest_contiguous_segment(self._clean)
         return metadata
     
