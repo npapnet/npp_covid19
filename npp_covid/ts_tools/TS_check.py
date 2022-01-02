@@ -163,7 +163,37 @@ def get_ds_perc(ds:pd.Series, indxs:list=[0,1])->pd.Series:
     ind_start = ds.index[int(ds.size // (1/indxs[0]) ) ]
     ind_end = ds.index[int( ds.size // (1/indxs[1]) ) ]
     return ds[ind_start:ind_end]
+
+
+
 # %%
+def convert_neg_to_na(ds:pd.Series, winsize:int=7)->pd.Series:
+    """This function generates a new data series and 
+    whenever a negative number appears it 
+    replaces the negative AND the subsequent winsize number with nan
+    
+    This is to be applied on a raw time series. This is to further clean smoothed data series
+    from entries that have dependence on negative numbers.
+
+    Args:
+        ds (pd.Series): [description]
+        winsize (int, optional): [description]. Defaults to 7.
+
+    Returns:
+        pd.Series: [description]
+    """    
+    ds_copy = ds[:]
+    neg_indx = np.where(ds_copy<0)[0]
+    ds_len = ds_copy.size
+    for k in range(len(neg_indx)):
+        ind = neg_indx[k]
+        for l in range(winsize):
+            ind2 = min([ind+l, ds_len-1])
+            ds_copy.iloc[ind2] = np.nan
+    return ds_copy
+
+# %%
+
 if __name__ =="__main__":
     def create_ds(no_periods=5):
         indx = pd.date_range(start='2021-12-01', periods=no_periods)
@@ -176,4 +206,3 @@ if __name__ =="__main__":
     
     
     
-# %%

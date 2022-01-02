@@ -110,7 +110,7 @@ def test_analyze_end():
 
 def test_analyze_negative():
     """tests analyze function of TS_Index_Checker for negative data
-    """    
+    """
     no_periods=15
     ds = create_ds(no_periods)
     
@@ -127,3 +127,33 @@ def test_analyze_negative():
     assert (oa._analyze() == {'length':15, 'na':0,
                 'largest_segment': [0,14],
                 'negative' : 2})
+
+#%%
+def test_convert_neg_na():
+    no_periods=15
+    ds = create_ds(no_periods)
+    ds2 = ds.replace(1,  -1)
+    winsize=2
+    ds3 = ds.replace(1,np.nan)
+    ds3 = ds3.replace(2,np.nan)
+    actual = tsc.convert_neg_to_na(ds2,winsize=winsize)
+    assert ds3.equals(actual)
+        
+        
+        
+    
+def test_convert_neg_na2():
+    """test conversion of negative to nan with two different locations
+    one in the middle and one right at the end (winsize extends beyond the sizes)
+    """    
+    no_periods=15
+    ds = create_ds(no_periods)
+    ds2 = ds.replace(1,  -1)
+    ds2.replace(14,  -1, inplace=True)
+    winsize=2
+    ds3 = ds.replace(1,np.nan)
+    ds3.replace(2,np.nan, inplace=True)
+    ds3.replace(14,np.nan, inplace=True)
+
+    actual = tsc.convert_neg_to_na(ds2,winsize=winsize)
+    assert ds3.equals(actual)
