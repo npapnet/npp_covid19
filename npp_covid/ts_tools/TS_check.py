@@ -62,7 +62,7 @@ class TS_Index_Checker():
     def __init__(self, ds:pd.Series) -> None:
         self._ds = ds
         self._clean = ds.dropna()
-        
+        self._analyze()
         # Initial checks
         if not is_index_date_time(ds):
             raise(TypeError("Index type is not pd.DatetimeIndex"))
@@ -70,6 +70,9 @@ class TS_Index_Checker():
     @property
     def ds(self):
         return self._ds
+
+    def ds_frac(self, indxs):
+        return get_ds_perc(self.ds, indxs)
  
     def _analyze(self)-> dict:
         """Returns a dictionary with some statistics for the time-series
@@ -82,12 +85,12 @@ class TS_Index_Checker():
                 'largest_segment' : refers to the indexes of the **clean** ds
             }
         """        
-        metadata = {}
-        metadata['length'] = len(self._ds)
-        metadata['na'] = self._ds.isna().sum()
-        metadata['negative'] = (self.ds<0).sum()
-        metadata['largest_segment'] = find_largest_contiguous_segment(self._clean)
-        return metadata
+        self.metadata = {}
+        self.metadata['length'] = len(self._ds)
+        self.metadata['na'] = self._ds.isna().sum()
+        self.metadata['negative'] = (self.ds<0).sum()
+        self.metadata['largest_segment'] = find_largest_contiguous_segment(self._clean)
+        return self.metadata
     
     def get_largest_continuous_segment(self):
         inds = find_largest_contiguous_segment(self._clean)
@@ -145,6 +148,21 @@ def find_largest_contiguous_segment(ds:pd.Series)->list:
 
     return all_segs[index_len]    
 
+def get_ds_perc(ds:pd.Series, indxs:list=[0,1])->pd.Series:
+    """return data series as percentile
+
+    Args:
+        ds (pd.Series): data series
+        indxs (list with two elemetns, optional): fractional indexes. Defaults to [0,1].
+
+    Returns:
+        [type]: [description]
+    """    
+    # ind_start = ds.index[int(np.round(indxs[0]*ds.size))]
+    # ind_end =  ds.index[int(np.round(indxs[1]*ds.size))]
+    ind_start = ds.index[int(ds.size // (1/indxs[0]) ) ]
+    ind_end = ds.index[int( ds.size // (1/indxs[1]) ) ]
+    return ds[ind_start:ind_end]
 # %%
 if __name__ =="__main__":
     def create_ds(no_periods=5):
