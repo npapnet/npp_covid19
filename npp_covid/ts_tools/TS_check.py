@@ -69,7 +69,25 @@ class TS_Index_Checker():
     
     @property
     def ds(self):
-        return self._ds
+        """returns a copy  original data series 
+        #TODO: clear up what happens if the self._ds is passed on.
+
+        Returns:
+            [type]: [description]
+        """
+        return self._ds[:]
+
+    @property
+    def clean_largest(self)->pd.Series:
+        """returns the largest continuous segment:
+        - without na
+        - TODO: without negative values
+
+        Returns:
+            [type]: [description]
+        """        
+        l_indx = find_largest_contiguous_segment(self._clean)
+        return self._clean.iloc[l_indx[0]:l_indx[1]]
 
     def ds_frac(self, indxs):
         return get_ds_perc(self.ds, indxs)
@@ -191,6 +209,21 @@ def convert_neg_to_na(ds:pd.Series, winsize:int=7)->pd.Series:
             ind2 = min([ind+l, ds_len-1])
             ds_copy.iloc[ind2] = np.nan
     return ds_copy
+
+def gen_ext_index(ds:pd.Series, win_size:int=7):
+    """generates an extended data_range index 
+    based on the smoothed data,  that starts at 
+    winsize days earlier that the ds
+    TODO: 
+
+    Args:
+        ds (pd.Series): [description]
+        winsize (int): window size (Defaults to 7)
+
+    Returns:
+        [type]: extended index by 7 days.
+    """        
+    return pd.date_range(start=ds.index[0]- dtm.timedelta(days=win_size-1), end=ds.index[-1],freq='D')
 
 # %%
 
