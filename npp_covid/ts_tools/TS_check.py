@@ -59,6 +59,15 @@ def is_index_date_time(ds:pd.Series)->bool:
     return  isinstance(ds.index, pd.DatetimeIndex)
 # %%
 class TS_Index_Checker():
+    """This class primary functions are to:
+    - self._ds: store the original data series
+    - self._clean: stores the 
+    
+    it has methods to:
+    - return the largest clean segment of the time series (From NA)
+    - return the largest clean segment of the time series (From NA)
+    
+    """    
     def __init__(self, ds:pd.Series) -> None:
         self._ds = ds
         self._clean = ds.dropna()
@@ -69,7 +78,7 @@ class TS_Index_Checker():
     
     @property
     def ds(self):
-        """returns a copy  original data series 
+        """returns a *copy* of the original data series 
         #TODO: clear up what happens if the self._ds is passed on.
 
         Returns:
@@ -89,13 +98,22 @@ class TS_Index_Checker():
         l_indx = find_largest_contiguous_segment(self._clean)
         return self._clean.iloc[l_indx[0]:l_indx[1]]
 
-    def ds_frac(self, indxs):
+    def ds_frac(self, indxs:list=[0,1]):
+        """Returns a fraction of the original data series
+        
+        This is a convenience method.
+
+        Args:
+            indxs (list, optional): fractional indexes from 0 to 1. Defaults to [0,1].
+
+        Returns:
+            pd.Series: The fraction of the original dataseries
+        """        
         return get_ds_perc(self.ds, indxs)
  
     def _analyze(self)-> dict:
         """Returns a dictionary with some statistics for the time-series
         
-
         Returns:
             dict: {
                 'length': original length.
@@ -104,10 +122,15 @@ class TS_Index_Checker():
             }
         """        
         self.metadata = {}
+        self.metadata['orig.start_date'] = self.ds.index.min()
+        self.metadata['orig.end_date'] = self.ds.index.max()
         self.metadata['length'] = len(self._ds)
         self.metadata['na'] = self._ds.isna().sum()
         self.metadata['negative'] = (self.ds<0).sum()
-        self.metadata['largest_segment'] = find_largest_contiguous_segment(self._clean)
+        lst_indx = find_largest_contiguous_segment(self._clean)
+        self.metadata['largest_segment'] = lst_indx
+        self.metadata['clean.start_date'] = self._clean.index[lst_indx[0]]
+        self.metadata['clean.end_date'] = self._clean.index[lst_indx[1]]
         return self.metadata
     
     def get_largest_continuous_segment(self):

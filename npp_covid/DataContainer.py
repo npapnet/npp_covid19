@@ -209,6 +209,7 @@ class Preprocessing_plotter():
         hag_d = self.data
         hag_d['confirmed'].plot(lw=0, marker='.')    
         hag_d['confirmed_sm'].plot()
+        plt.grid()
 
     def weekday_boxplot(self, data_series_name:str, save_to_file:bool=None, 
         x_label:str=None, normalised:bool = True):
